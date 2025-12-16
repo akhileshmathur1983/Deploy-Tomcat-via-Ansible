@@ -1,0 +1,60 @@
+---
+ - name:  Installing Tomcat Server on the managed node
+   hosts: prod
+   become: yes
+   tasks:
+    - name: Download Tomcat from dlcdn
+      get-url: 
+        url: "https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.50/bin/apache-tomcat-10.1.50.tar.gz"
+        dest: /root/ 
+    
+    - name: Untar the apache file
+      command: tar -xvzf apache-tomcat-10.1.50.tar.gz
+
+    - name: Rename the Tomcat
+      command: mv apache-tomcat-10.1.50 tomcat
+
+    - name: Install the latest available java (openjdk)
+      yum:
+        name: java-17-amazon-corretto
+        state: present
+
+    - name: setting the roles in tomcat-users.xml file
+      template:
+        src: tomcat-users.xml
+        dest: /root/tomcat/conf/tomcat-user.xml
+
+    - name: Delete two lines in context.xml
+      template:
+        src: context.xml
+        dest: /root/tomcat/webapps/manager/META-INF/context.xml
+
+    - name: create Tomcat systemd service file
+      copy:
+        dest: /etc/systemd/system/tomcat.service
+        content:  |
+          [Unit]
+          Desciption=Apache tomcat Server
+          After=network.target
+
+          [Service]
+          User=root
+          Group=root
+          Type=forking
+          Environment="JAVA_HOME=/usr/lib/jvm/jre"
+          Environment="CATALINA_HOME=/root/tomcat"
+          ExecStart=/root/tomcat/bin/startup.sh
+          ExecStop=/root/tomcat/bin/shutdown.sh
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+    - name: Start tomcat service
+      service:
+         name: tomcat
+         state: started
+         enabled: yes
+
